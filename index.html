@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0d1330">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>FormFit — Push-Up Battle</title>
+<style>
+  * { box-sizing: border-box; }
+  html { min-height: 100%; background:#070914; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: Arial, Helvetica, sans-serif;
+    color: white;
+    background:
+      radial-gradient(circle at 50% 0%, #253a70 0%, #10152d 42%, #070914 100%);
+    overflow-x: hidden;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+  .app { width: min(1220px, 96vw); margin: 0 auto; padding: max(10px, env(safe-area-inset-top)) 14px max(16px, env(safe-area-inset-bottom)); }
+  .top {
+    display:flex; justify-content:space-between; align-items:center;
+    gap:12px; margin-bottom:14px;
+  }
+  .logo { font-size:25px; font-weight:900; letter-spacing:1px; }
+  .logo span { color:#5ee7ff; }
+  button {
+    border:0;
+    min-height:44px;
+    touch-action:manipulation;
+    -webkit-appearance:none; border-radius:12px; padding:11px 16px; color:white;
+    background:#26345f; font-weight:800; cursor:pointer;
+  }
+  button:hover { filter:brightness(1.15); }
+  .battle {
+    display:grid; grid-template-columns: minmax(0, 1fr) 290px; gap:14px;
+  }
+  .camera {
+    position:relative; min-height:570px; height:min(72vh, 760px); overflow:hidden;
+    border:2px solid #34467e; border-radius:20px;
+    background:#050713; box-shadow:0 20px 70px #0008;
+  }
+  video, #output {
+    position:absolute; inset:0; width:100%; height:100%;
+    object-fit:cover; transform:scaleX(-1);
+  }
+  #output { pointer-events:none; }
+  .cameraMessage {
+    position:absolute; inset:0; display:grid; place-items:center;
+    text-align:center; padding:30px; background:#050713cc;
+    z-index:4;
+  }
+  .cameraMessage.hidden { display:none; }
+  .cameraMessage h2 { margin:0 0 8px; }
+  .hud {
+    position:absolute; left:16px; right:16px; top:14px; z-index:5;
+    display:flex; justify-content:space-between; gap:10px;
+  }
+  .pill {
+    background:#090d1ddd; border:1px solid #ffffff22;
+    backdrop-filter:blur(8px); border-radius:14px; padding:10px 14px;
+  }
+  .label { font-size:11px; color:#aeb9da; text-transform:uppercase; }
+  .value { font-size:25px; font-weight:900; }
+  .feedback {
+    position:absolute; left:50%; bottom:18px; transform:translateX(-50%);
+    z-index:5; width:min(90%,650px); text-align:center;
+    background:#080c18e8; border:1px solid #ffffff22;
+    border-radius:16px; padding:13px 18px; font-weight:800;
+  }
+  .side {
+    border:1px solid #34467e; border-radius:20px; padding:18px;
+    background:#0d1330dd; box-shadow:0 20px 70px #0006;
+  }
+  .enemy {
+    height:190px; display:grid; place-items:center; position:relative;
+    border-radius:18px; background:linear-gradient(180deg,#171f45,#0a0d20);
+    border:1px solid #ffffff18; overflow:hidden; margin-bottom:15px;
+  }
+  .enemyFace { font-size:72px; transition:.15s; }
+  .enemy.hit .enemyFace { transform:translateX(12px) rotate(8deg) scale(1.12); }
+  .hpOuter { height:18px; border-radius:99px; background:#03040a; overflow:hidden; }
+  .hpInner { height:100%; width:100%; background:linear-gradient(90deg,#ff3e71,#ffb13e); transition:.25s; }
+  .statGrid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; }
+  .stat { padding:12px; border-radius:14px; background:#ffffff08; border:1px solid #ffffff10; }
+  .stat b { display:block; font-size:25px; margin-top:4px; }
+  .controls { margin-top:15px; display:grid; gap:9px; }
+  .primary { background:linear-gradient(135deg,#2ddcff,#4e78ff); color:#06101c; }
+  .danger { background:#8d2844; }
+  .tips { margin-top:15px; color:#aeb9da; font-size:13px; line-height:1.5; }
+  .meter { margin-top:14px; }
+  .meterBar { height:10px; border-radius:99px; background:#050711; overflow:hidden; }
+  .meterFill { height:100%; width:0%; background:#5ee7ff; transition:.1s; }
+  .status { margin-top:10px; font-size:13px; color:#aeb9da; }
+  @media (max-width:850px) {
+    .app { width:100%; padding-left:12px; padding-right:12px; }
+    .top { align-items:center; }
+    .logo { font-size:23px; }
+    .top #flipBtn { padding:10px 12px; }
+    .battle { grid-template-columns:1fr; }
+    .camera { min-height:360px; height:min(68svh, 620px); border-radius:18px; }
+    .side { border-radius:18px; padding:14px; }
+    .enemy { height:130px; }
+    .statGrid { grid-template-columns:repeat(4, 1fr); }
+    .stat { padding:9px; }
+    .stat b { font-size:20px; }
+    .tips { font-size:12px; }
+  }
+
+  @media (max-width:520px) {
+    .app { padding-top:10px; }
+    .top { margin-bottom:10px; }
+    .camera { height:64svh; min-height:360px; }
+    .hud { left:9px; right:9px; top:9px; gap:6px; }
+    .pill { padding:7px 9px; border-radius:11px; }
+    .label { font-size:9px; }
+    .value { font-size:19px; }
+    .feedback { bottom:9px; width:calc(100% - 18px); padding:10px 12px; font-size:13px; }
+    .statGrid { gap:6px; }
+    .stat { padding:8px 6px; }
+    .stat b { font-size:18px; }
+    .controls { grid-template-columns:1fr 1fr; }
+    .controls button { padding:10px 8px; font-size:12px; }
+  }
+
+  @media (orientation:landscape) and (max-height:600px) {
+    .camera { height:82vh; }
+    .side { display:grid; grid-template-columns:1fr 1fr; gap:10px; align-items:start; }
+    .enemy { grid-row:span 2; margin-bottom:0; }
+    .controls { margin-top:0; }
+    .tips, .status { grid-column:1 / -1; }
+  }
+
+  .permissionNotice {
+    margin-top:10px; padding:10px 12px; border-radius:12px;
+    background:#121a38; border:1px solid #4a5f9c; color:#d9e2ff;
+    font-size:12px; line-height:1.4;
+  }
+  .permissionNotice strong { color:#5ee7ff; }
+
+</style>
+
+<link rel="manifest" href="manifest.webmanifest">
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div class="logo">FORM<span>FIT</span> ⚡</div>
+    <button id="flipBtn">Flip Camera</button>
+  </div>
+
+  <div class="battle">
+    <section class="camera">
+      <video id="video" playsinline muted></video>
+      <canvas id="output"></canvas>
+
+      <div class="cameraMessage" id="cameraMessage">
+        <div>
+          <h2 style="font-size:22px;">Push-Up Battle</h2>
+          <p>Allow camera access, then get your whole body in frame.</p>
+          <button class="primary" id="startBtn">📷 ALLOW CAMERA &amp; START</button>
+          <button id="testCameraBtn" style="margin-top:8px;">TEST CAMERA PERMISSION</button>
+          <p id="permissionHint" style="font-size:12px;color:#aeb9da;margin:8px 0 0;">
+            Camera access is requested after you press a button.
+          </p>
+          <div class="permissionNotice" id="permissionNotice">
+      <strong>Android:</strong> open this game from an <b>HTTPS website</b> in Chrome.
+      Tap <b>ALLOW CAMERA &amp; START</b>, then choose <b>Allow</b> when Chrome asks.
+      If you previously blocked it, open Chrome → Settings → Site settings → Camera and allow this site.
+    </div>
+        </div>
+      </div>
+
+      <div class="hud">
+        <div class="pill"><div class="label" data-i18n="reps">Reps</div><div class="value" id="reps">0</div></div>
+        <div class="pill"><div class="label" data-i18n="score">Score</div><div class="value" id="score">0</div></div>
+        <div class="pill"><div class="label" data-i18n="combo">Combo</div><div class="value" id="combo">x0</div></div>
+      </div>
+
+      <div class="feedback" id="feedback">Press START CAMERA</div>
+    </section>
+
+    <aside class="side">
+      <div class="enemy" id="enemy">
+        <div class="enemyFace" id="enemyFace">👾</div>
+      </div>
+      <div class="label" data-i18n="enemyHP">Enemy HP</div>
+      <div class="hpOuter"><div class="hpInner" id="hp"></div></div>
+
+      <div class="statGrid">
+        <div class="stat"><span class="label" data-i18n="form">Form</span><b id="formScore">--</b></div>
+        <div class="stat"><span class="label" data-i18n="stage">Stage</span><b id="stage">UP</b></div>
+        <div class="stat"><span class="label" data-i18n="best">Best combo</span><b id="best">0</b></div>
+        <div class="stat"><span class="label" data-i18n="time">Time</span><b id="time">0:00</b></div>
+      </div>
+
+      <div class="meter">
+        <div class="label" data-i18n="progress">Push-up progress</div>
+        <div class="meterBar"><div class="meterFill" id="progress"></div></div>
+      </div>
+
+      
+      <div class="languagePicker" style="margin-bottom:12px;">
+        <div class="label" style="margin-bottom:6px;">Language</div>
+        <select id="languageSelect" style="width:100%;min-height:44px;border:0;border-radius:12px;padding:10px 12px;background:#26345f;color:white;font-weight:800;">
+          <option value="en" selected>🇬🇧 English</option>
+          <option value="es">🇪🇸 Español</option>
+          <option value="ru">🇷🇺 Русский</option>
+          <option value="ar">🇸🇦 العربية</option>
+          <option value="he">🇮🇱 עברית</option>
+        </select>
+      </div>
+
+      <div class="workoutPicker" style="margin-bottom:12px;">
+        <div class="label" style="margin-bottom:6px;">Workout</div>
+        <select id="workoutSelect" style="width:100%;min-height:44px;border:0;border-radius:12px;padding:10px 12px;background:#26345f;color:white;font-weight:800;">
+          <option value="pushups" selected>💪 Push-Ups</option>
+          <option value="pullups">🏋️ Pull-Ups</option>
+          <option value="squats">🦵 Squats</option>
+          <option value="plank">⏱️ Plank Timer</option>
+        </select>
+      </div>
+
+      <div class="controls">
+        <button class="primary" id="resetBtn">RESET BATTLE</button>
+        <button id="quitBtn" class="danger">QUIT</button>
+        <label style="display:grid;gap:5px;">
+          <span class="label">Difficulty</span>
+          <select id="difficultySelect" style="width:100%;min-height:44px;border:0;border-radius:12px;padding:10px 12px;background:#26345f;color:white;font-weight:800;">
+            <option value="rookie">Rookie</option>
+            <option value="beginner">Beginner</option>
+            <option value="normal" selected>Normal</option>
+            <option value="pro">Pro</option>
+            <option value="expert">Expert</option>
+            <option value="beast">Beast</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="tips">
+        <b>How to get good tracking:</b><br>
+        • Put the camera far enough away to see your whole body.<br>
+        • For push-ups, use a side view.<br>
+        • Keep your shoulders, hips, knees and ankles visible.<br>
+        • Go down under control, then push all the way back up.
+      </div>
+      <div class="status" id="status">Ready — press a button to begin.</div>
+      <div class="status">Workout: <b id="workoutLabel">Push-Ups</b></div>
+      <div class="status">Difficulty: <b id="difficultyLabel">Normal</b></div>
+    </aside>
+  </div>
+</div>
+
+<!-- MediaPipe Pose runs in the browser. Internet is needed to load these libraries. -->
+<!-- MediaPipe is loaded only when the user starts the camera. -->
+
+
+<script>
+const video = document.getElementById("video");
+const canvas = document.getElementById("output");
+const ctx = canvas.getContext("2d");
+const cameraMessage = document.getElementById("cameraMessage");
+const feedback = document.getElementById("feedback");
+const statusEl = document.getElementById("status");
+
+let camera = null;
+let stream = null;
+let started = false;
+let mirrored = true;
+let stage = "UP";
+let reps = 0;
+let score = 0;
+let combo = 0;
+let bestCombo = 0;
+let enemyHP = 100;
+let difficulty = "normal";
+const difficultySettings = {
+  rookie:   { down: 115, up: 150, damage: 5,  label: "Rookie" },
+  beginner: { down: 110, up: 152, damage: 6,  label: "Beginner" },
+  normal:   { down: 105, up: 155, damage: 8,  label: "Normal" },
+  pro:      { down: 100, up: 158, damage: 10, label: "Pro" },
+  expert:   { down: 95,  up: 162, damage: 12, label: "Expert" },
+  beast:    { down: 90,  up: 165, damage: 15, label: "Beast" }
+};
+let startTime = 0;
+let lastRepTime = 0;
+let cooldown = false;
+let lastForm = 0;
+let workout = "pushups";
+let plankStart = 0;
+let plankRunning = false;
+let lastFrameTime = 0;
+const whiteTrackingColor = "#ffffff";
+
+
+const translations = {
+  en: {
+    workout:"Workout", difficulty:"Difficulty", reset:"RESET BATTLE", quit:"QUIT",
+    start:"📷 ALLOW CAMERA & START", test:"TEST CAMERA PERMISSION",
+    pushups:"💪 Push-Ups", pullups:"🏋️ Pull-Ups", squats:"🦵 Squats", plank:"⏱️ Plank Timer",
+    rookie:"Rookie", beginner:"Beginner", normal:"Normal", pro:"Pro", expert:"Expert", beast:"Beast",
+    ready:"Ready — press a button to begin.", camera:"Camera access is requested after you press a button.",
+    reps:"Reps", score:"Score", combo:"Combo", form:"Form", stage:"Stage", best:"Best combo", time:"Time",
+    enemyHP:"Enemy HP", progress:"Push-up progress", allow:"📷 Please allow camera access when Chrome asks.",
+    denied:"📷 Camera permission was denied. Allow it in browser settings and try again.",
+    workoutChanged:"Workout changed to ", plankReady:"Get into a straight plank position"
+  },
+  es: {
+    workout:"Ejercicio", difficulty:"Dificultad", reset:"REINICIAR BATALLA", quit:"SALIR",
+    start:"📷 PERMITIR CÁMARA Y EMPEZAR", test:"PROBAR PERMISO DE CÁMARA",
+    pushups:"💪 Flexiones", pullups:"🏋️ Dominadas", squats:"🦵 Sentadillas", plank:"⏱️ Plancha",
+    rookie:"Novato", beginner:"Principiante", normal:"Normal", pro:"Pro", expert:"Experto", beast:"Bestia",
+    ready:"Listo — pulsa un botón para comenzar.", camera:"El acceso a la cámara se solicita después de pulsar un botón.",
+    reps:"Repeticiones", score:"Puntuación", combo:"Combo", form:"Técnica", stage:"Etapa", best:"Mejor combo", time:"Tiempo",
+    enemyHP:"Vida del enemigo", progress:"Progreso de flexiones", allow:"📷 Permite el acceso a la cámara cuando Chrome lo solicite.",
+    denied:"📷 Se denegó el acceso a la cámara. Permítelo en la configuración del navegador e inténtalo de nuevo.",
+    workoutChanged:"Ejercicio cambiado a ", plankReady:"Colócate en posición de plancha recta"
+  },
+  ru: {
+    workout:"Упражнение", difficulty:"Сложность", reset:"СБРОСИТЬ БОЙ", quit:"ВЫЙТИ",
+    start:"📷 РАЗРЕШИТЬ КАМЕРУ И НАЧАТЬ", test:"ПРОВЕРИТЬ ДОСТУП К КАМЕРЕ",
+    pushups:"💪 Отжимания", pullups:"🏋️ Подтягивания", squats:"🦵 Приседания", plank:"⏱️ Планка",
+    rookie:"Новичок", beginner:"Начинающий", normal:"Обычный", pro:"Про", expert:"Эксперт", beast:"Зверь",
+    ready:"Готово — нажмите кнопку, чтобы начать.", camera:"Доступ к камере запрашивается после нажатия кнопки.",
+    reps:"Повторы", score:"Очки", combo:"Комбо", form:"Техника", stage:"Этап", best:"Лучшее комбо", time:"Время",
+    enemyHP:"Здоровье врага", progress:"Прогресс отжиманий", allow:"📷 Разрешите доступ к камере, когда Chrome запросит его.",
+    denied:"📷 Доступ к камере запрещён. Разрешите его в настройках браузера и попробуйте снова.",
+    workoutChanged:"Упражнение изменено на ", plankReady:"Примите ровное положение планки"
+  },
+  ar: {
+    workout:"التمرين", difficulty:"الصعوبة", reset:"إعادة المعركة", quit:"خروج",
+    start:"📷 السماح بالكاميرا والبدء", test:"اختبار إذن الكاميرا",
+    pushups:"💪 تمارين الضغط", pullups:"🏋️ العقلة", squats:"🦵 القرفصاء", plank:"⏱️ البلانك",
+    rookie:"مبتدئ جدًا", beginner:"مبتدئ", normal:"عادي", pro:"محترف", expert:"خبير", beast:"وحش",
+    ready:"جاهز — اضغط زرًا للبدء.", camera:"سيتم طلب الوصول إلى الكاميرا بعد الضغط على زر.",
+    reps:"التكرارات", score:"النقاط", combo:"كومبو", form:"الوضعية", stage:"المرحلة", best:"أفضل كومبو", time:"الوقت",
+    enemyHP:"صحة الخصم", progress:"تقدم الضغط", allow:"📷 اسمح بالوصول إلى الكاميرا عندما يطلب Chrome ذلك.",
+    denied:"📷 تم رفض إذن الكاميرا. اسمح به من إعدادات المتصفح ثم حاول مرة أخرى.",
+    workoutChanged:"تم تغيير التمرين إلى ", plankReady:"اتخذ وضعية بلانك مستقيمة"
+  },
+  he: {
+    workout:"אימון", difficulty:"רמת קושי", reset:"איפוס קרב", quit:"יציאה",
+    start:"📷 אפשר מצלמה והתחל", test:"בדיקת הרשאת מצלמה",
+    pushups:"💪 שכיבות סמיכה", pullups:"🏋️ מתח", squats:"🦵 סקוואטים", plank:"⏱️ פלאנק",
+    rookie:"מתחיל", beginner:"מתחיל+", normal:"רגיל", pro:"מקצוען", expert:"מומחה", beast:"חיה",
+    ready:"מוכן — לחץ על כפתור כדי להתחיל.", camera:"הגישה למצלמה תתבקש לאחר לחיצה על כפתור.",
+    reps:"חזרות", score:"ניקוד", combo:"קומבו", form:"טכניקה", stage:"שלב", best:"קומבו שיא", time:"זמן",
+    enemyHP:"חיי האויב", progress:"התקדמות שכיבות סמיכה", allow:"📷 אשר גישה למצלמה כאשר Chrome יבקש.",
+    denied:"📷 הגישה למצלמה נדחתה. אשר אותה בהגדרות הדפדפן ונסה שוב.",
+    workoutChanged:"האימון שונה ל־", plankReady:"היכנס לתנוחת פלאנק ישרה"
+  }
+};
+let language = "en";
+function t(key) { return translations[language][key] || translations.en[key] || key; }
+
+const workoutSettings = {
+  pushups: { label: "Push-Ups", unit: "reps" },
+  pullups: { label: "Pull-Ups", unit: "reps" },
+  squats: { label: "Squats", unit: "reps" },
+  plank: { label: "Plank", unit: "time" }
+};
+
+// ---------- Math ----------
+function dist(a,b) {
+  return Math.hypot(a.x-b.x, a.y-b.y);
+}
+
+function angle(a,b,c) {
+  const ab = {x:a.x-b.x, y:a.y-b.y};
+  const cb = {x:c.x-b.x, y:c.y-b.y};
+  const dot = ab.x*cb.x + ab.y*cb.y;
+  const den = Math.hypot(ab.x,ab.y) * Math.hypot(cb.x,cb.y);
+  if (!den) return 0;
+  return Math.acos(Math.max(-1,Math.min(1,dot/den))) * 180 / Math.PI;
+}
+
+function midpoint(a,b) {
+  return {x:(a.x+b.x)/2, y:(a.y+b.y)/2, visibility:Math.min(a.visibility||1,b.visibility||1)};
+}
+
+function goodVisibility(p) {
+  return p && (p.visibility ?? 1) > 0.55;
+}
+
+// ---------- UI ----------
+function setText(id, value) {
+  document.getElementById(id).textContent = value;
+}
+
+function formatTime() {
+  const seconds = Math.floor((Date.now()-startTime)/1000);
+  return `${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,"0")}`;
+}
+
+setInterval(() => {
+  if (!started) return;
+
+  if (workout === "plank" && plankRunning) {
+    const seconds = Math.floor((performance.now() - plankStart) / 1000);
+    setText("time", `${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,"0")}`);
+  } else {
+    setText("time", formatTime());
+  }
+}, 250);
+
+function hitEnemy() {
+  enemyHP = Math.max(0, enemyHP - difficultySettings[difficulty].damage);
+  document.getElementById("hp").style.width = enemyHP + "%";
+  const enemy = document.getElementById("enemy");
+  enemy.classList.add("hit");
+  setTimeout(() => enemy.classList.remove("hit"), 150);
+
+  if (enemyHP <= 0) {
+    feedback.textContent = "🔥 ENEMY DEFEATED! Reset to start a new battle.";
+  }
+}
+
+function registerRep(form) {
+  reps++;
+  combo++;
+  bestCombo = Math.max(bestCombo, combo);
+
+  const points = Math.round(form * 10) + combo * 2;
+  score += points;
+
+  if (workout !== "plank") hitEnemy();
+
+  setText("reps", reps);
+  setText("score", score);
+  setText("combo", "x" + combo);
+  setText("best", bestCombo);
+  setText("formScore", Math.round(form * 100) + "%");
+
+  document.getElementById("progress").style.width =
+    Math.min(100, (reps % 10) * 10 || (reps ? 100 : 0)) + "%";
+
+  feedback.textContent =
+    `💥 REP ${reps}! +${points} points — ${Math.round(form*100)}% form`;
+}
+
+function resetBattle() {
+  stage = "UP";
+  reps = 0;
+  score = 0;
+  combo = 0;
+  bestCombo = 0;
+  enemyHP = 100;
+  lastRepTime = 0;
+  plankStart = 0;
+  plankRunning = false;
+  setText("reps",0);
+  setText("score",0);
+  setText("combo","x0");
+  setText("best",0);
+  setText("formScore","--");
+  setText("stage","UP");
+  document.getElementById("hp").style.width = "100%";
+  document.getElementById("progress").style.width = "0%";
+  feedback.textContent = started ? "Get ready!" : "Press START CAMERA";
+}
+
+// ---------- Pose processing ----------
+function onResults(results) {
+  if (!results.image) return;
+
+  // Ignore excessively frequent pose frames to keep phones responsive.
+  const nowFrame = performance.now();
+  if (nowFrame - lastFrameTime < 45) return; // ~22 FPS tracking cap
+  lastFrameTime = nowFrame;
+
+  canvas.width = results.image.width;
+  canvas.height = results.image.height;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.save();
+
+  // Mirror the drawing to match the video.
+  if (mirrored) {
+    ctx.translate(canvas.width,0);
+    ctx.scale(-1,1);
+  }
+
+  // Draw skeleton.
+  if (results.poseLandmarks) {
+    drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS,
+      {color:"#ffffff", lineWidth:4});
+    drawLandmarks(ctx, results.poseLandmarks,
+      {color:"#ffffff", lineWidth:1, radius:4});
+  }
+
+  ctx.restore();
+
+  if (!results.poseLandmarks) {
+    feedback.textContent = "👤 No body detected — step back and show your whole body";
+    setText("formScore","--");
+    return;
+  }
+
+  const p = results.poseLandmarks;
+
+  const L = {
+    shoulder:p[11], elbow:p[13], wrist:p[15],
+    hip:p[23], knee:p[25], ankle:p[27]
+  };
+  const R = {
+    shoulder:p[12], elbow:p[14], wrist:p[16],
+    hip:p[24], knee:p[26], ankle:p[28]
+  };
+
+  const needed = Object.values(L).concat(Object.values(R));
+  if (!needed.every(goodVisibility)) {
+    feedback.textContent = "⚠️ Keep your whole body visible to the camera";
+    setText("formScore","--");
+    return;
+  }
+
+  const shoulder = midpoint(L.shoulder,R.shoulder);
+  const elbow = midpoint(L.elbow,R.elbow);
+  const wrist = midpoint(L.wrist,R.wrist);
+  const hip = midpoint(L.hip,R.hip);
+  const knee = midpoint(L.knee,R.knee);
+  const ankle = midpoint(L.ankle,R.ankle);
+
+  const elbowAngle = angle(shoulder, elbow, wrist);
+  const kneeAngle = angle(hip, knee, ankle);
+  const bodyAngle = angle(shoulder, hip, ankle);
+
+  let form = 0;
+
+  if (workout === "pushups") {
+    const bodyScore = Math.max(0, Math.min(1, (bodyAngle - 135) / 45));
+    const depthScore = Math.max(0, Math.min(1, (120 - elbowAngle) / 40));
+    form = stage === "DOWN"
+      ? (bodyScore * 0.65 + depthScore * 0.35)
+      : bodyScore;
+
+    lastForm = form;
+    setText("formScore", Math.round(form*100) + "%");
+
+    if (bodyAngle < 135) feedback.textContent = "⚠️ Keep your body straighter";
+    else if (stage === "DOWN" && elbowAngle > 120) feedback.textContent = "⬇️ Go a little lower";
+    else if (stage === "DOWN") feedback.textContent = "✅ Good depth — push back up!";
+    else feedback.textContent = "💪 Lower under control";
+
+    const settings = difficultySettings[difficulty];
+    if (stage === "UP" && elbowAngle < settings.down) {
+      stage = "DOWN";
+      setText("stage","DOWN");
+    }
+
+    if (stage === "DOWN" && elbowAngle > settings.up) {
+      const now = performance.now();
+      if (now - lastRepTime > 550) {
+        registerRep(Math.max(0.25, form));
+        lastRepTime = now;
+      }
+      stage = "UP";
+      setText("stage","UP");
+    }
+
+  } else if (workout === "squats") {
+    const squatDepth = Math.max(0, Math.min(1, (125 - kneeAngle) / 55));
+    const backScore = Math.max(0, Math.min(1, (bodyAngle - 105) / 55));
+    form = squatDepth * 0.65 + backScore * 0.35;
+    setText("formScore", Math.round(form*100) + "%");
+
+    if (stage === "UP" && kneeAngle < 125) {
+      stage = "DOWN";
+      setText("stage","DOWN");
+      feedback.textContent = "⬇️ Good — stand back up";
+    } else if (stage === "DOWN" && kneeAngle > 160) {
+      const now = performance.now();
+      if (now - lastRepTime > 550) {
+        registerRep(Math.max(0.25, form));
+        lastRepTime = now;
+      }
+      stage = "UP";
+      setText("stage","UP");
+      feedback.textContent = "🦵 Squat rep!";
+    } else {
+      feedback.textContent = "🦵 Bend your knees and keep your chest up";
+    }
+
+  } else if (workout === "pullups") {
+    // Camera-side pull-up estimate: elbow flexion + shoulder/hip relationship.
+    const pullScore = Math.max(0, Math.min(1, (125 - elbowAngle) / 75));
+    const bodyScore = Math.max(0, Math.min(1, (bodyAngle - 125) / 55));
+    form = pullScore * 0.7 + bodyScore * 0.3;
+    setText("formScore", Math.round(form*100) + "%");
+
+    if (stage === "UP" && elbowAngle < 100) {
+      stage = "DOWN";
+      setText("stage","TOP");
+      feedback.textContent = "⬇️ Lower with control";
+    } else if (stage === "DOWN" && elbowAngle > 155) {
+      const now = performance.now();
+      if (now - lastRepTime > 650) {
+        registerRep(Math.max(0.25, form));
+        lastRepTime = now;
+      }
+      stage = "UP";
+      setText("stage","UP");
+      feedback.textContent = "🏋️ Pull-up rep!";
+    } else {
+      feedback.textContent = "🏋️ Pull high, then lower under control";
+    }
+
+  } else if (workout === "plank") {
+    // Plank is time-based; use a straight-body score as form.
+    const straightness = Math.max(0, Math.min(1, (bodyAngle - 135) / 45));
+    form = straightness;
+    setText("formScore", Math.round(form*100) + "%");
+    setText("stage", form > 0.7 ? "HOLD" : "ADJUST");
+
+    if (form > 0.7) {
+      if (!plankRunning) {
+        plankRunning = true;
+        plankStart = performance.now() - (reps * 1000);
+      }
+      reps = Math.floor((performance.now() - plankStart) / 1000);
+      setText("reps", reps);
+      setText("time", `${Math.floor(reps/60)}:${String(reps%60).padStart(2,"0")}`);
+      feedback.textContent = "🔥 Hold it! Keep your body straight";
+    } else {
+      if (plankRunning) {
+        plankRunning = false;
+      }
+      feedback.textContent = "⚠️ Straighten your body to start the plank timer";
+    }
+  }
+
+  // Combo expires if too much time passes between reps.
+  if (lastRepTime && performance.now() - lastRepTime > 5000 && combo > 0) {
+    combo = 0;
+    setText("combo","x0");
+  }
+}
+
+// ---------- Camera ----------
+async function startCamera() {
+  try {
+    statusEl.textContent = "Opening camera…";
+    feedback.textContent = "📷 Requesting camera permission…";
+
+    if (!window.isSecureContext) {
+      statusEl.textContent = "Camera needs HTTPS.";
+      feedback.textContent = "🔒 Open FormFit from an HTTPS website in Chrome/Safari.";
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      statusEl.textContent = "Camera API unavailable.";
+      feedback.textContent = "❌ This browser cannot use the camera.";
+      return;
+    }
+
+    if (stream) {
+      stream.getTracks().forEach(t => t.stop());
+      stream = null;
+    }
+
+    // Keep the first request simple and broadly compatible with Android + iPhone.
+    // We prefer the user's camera because it is available on essentially every phone.
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: "user",
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
+      });
+    } catch (firstError) {
+      // Fallback: let the browser choose any camera it can provide.
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: false
+      });
+    }
+
+    // Show the camera immediately after permission is granted.
+    video.srcObject = stream;
+    video.muted = true;
+    video.autoplay = true;
+    video.playsInline = true;
+    video.setAttribute("webkit-playsinline", "true");
+
+    await video.play();
+
+    cameraMessage.classList.add("hidden");
+    started = true;
+    startTime = Date.now();
+    statusEl.textContent = "Camera connected ✓";
+    feedback.textContent = "✅ Camera is working. Loading body tracking…";
+
+    // Start pose tracking only after the camera feed is visibly running.
+    await loadMediaPipe();
+
+    statusEl.textContent = "Camera + tracking active ✓";
+    feedback.textContent = "Get your whole body in frame.";
+
+    startPoseLoop();
+
+  } catch (err) {
+    console.error("Camera error:", err);
+
+    const name = err?.name || "";
+    if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+      statusEl.textContent = "Camera permission blocked.";
+      feedback.textContent = "📷 Permission is blocked for this site. In Chrome: ⋮ → Settings → Site settings → Camera → Allow. Then reload.";
+    } else if (name === "NotFoundError") {
+      statusEl.textContent = "No camera found.";
+      feedback.textContent = "❌ No camera was found on this device.";
+    } else if (name === "NotReadableError") {
+      statusEl.textContent = "Camera is busy.";
+      feedback.textContent = "❌ Another app may be using the camera. Close it and try again.";
+    } else if (name === "SecurityError" || name === "TypeError") {
+      statusEl.textContent = "Camera blocked by page security.";
+      feedback.textContent = "🔒 Camera access needs an HTTPS website (or localhost).";
+    } else {
+      statusEl.textContent = "Camera error: " + (err?.message || name || "Unknown error");
+      feedback.textContent = "❌ Camera could not start.";
+    }
+  }
+}
+
+let pose = null;
+let mediaPipeReady = false;
+
+
+function applyLanguage() {
+  const d = difficultySettings[difficulty];
+  document.documentElement.dir = language === "ar" || language === "he" ? "rtl" : "ltr";
+  document.querySelector(".workoutPicker .label").textContent = t("workout");
+  document.querySelector(".languagePicker .label").textContent = "Language";
+  document.querySelector("#difficultySelect").previousElementSibling.textContent = t("difficulty");
+  document.getElementById("resetBtn").textContent = t("reset");
+  document.getElementById("quitBtn").textContent = t("quit");
+  document.getElementById("startBtn").textContent = t("start");
+  document.getElementById("testCameraBtn").textContent = t("test");
+  document.getElementById("workoutLabel").textContent = t(workout);
+  document.getElementById("difficultyLabel").textContent = t(d);
+  document.getElementById("status").textContent = t("ready");
+  document.getElementById("permissionHint").textContent = t("camera");
+
+  const workoutSelect = document.getElementById("workoutSelect");
+  workoutSelect.options[0].textContent = t("pushups");
+  workoutSelect.options[1].textContent = t("pullups");
+  workoutSelect.options[2].textContent = t("squats");
+  workoutSelect.options[3].textContent = t("plank");
+
+  const diff = document.getElementById("difficultySelect");
+  diff.options[0].textContent = t("rookie");
+  diff.options[1].textContent = t("beginner");
+  diff.options[2].textContent = t("normal");
+  diff.options[3].textContent = t("pro");
+  diff.options[4].textContent = t("expert");
+  diff.options[5].textContent = t("beast");
+}
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = true;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error("Could not load " + src));
+    document.head.appendChild(script);
+  });
+}
+
+
+let poseLoopRunning = false;
+let poseBusy = false;
+let lastPoseFrame = 0;
+
+async function startPoseLoop() {
+  if (poseLoopRunning) return;
+  poseLoopRunning = true;
+
+  const loop = async (timestamp) => {
+    if (!started || !stream || video.readyState < 2) {
+      poseLoopRunning = false;
+      return;
+    }
+
+    // Target ~18 fps on mobile to reduce heat/lag while keeping tracking responsive.
+    if (!poseBusy && timestamp - lastPoseFrame >= 55 && pose) {
+      lastPoseFrame = timestamp;
+      poseBusy = true;
+      try {
+        await pose.send({ image: video });
+      } catch (e) {
+        console.warn("Pose frame failed", e);
+      } finally {
+        poseBusy = false;
+      }
+    }
+
+    requestAnimationFrame(loop);
+  };
+
+  requestAnimationFrame(loop);
+}
+
+async function loadMediaPipe() {
+  if (mediaPipeReady) return;
+
+  statusEl.textContent = "Loading pose tracking…";
+
+  await loadScript("https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js");
+  await loadScript("https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js");
+
+  pose = new Pose({
+    locateFile: (file) =>
+      `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
+  });
+
+  pose.setOptions({
+    modelComplexity: 0,
+    smoothLandmarks: true,
+    enableSegmentation: false,
+    minDetectionConfidence: 0.55,
+    minTrackingConfidence: 0.55
+  });
+
+  pose.onResults(onResults);
+  mediaPipeReady = true;
+}
+
+const testCameraBtn = document.getElementById("testCameraBtn");
+if (testCameraBtn) testCameraBtn.addEventListener("click", async () => {
+  try {
+    statusEl.textContent = "Requesting camera permission…";
+    feedback.textContent = "📷 If Chrome/Safari asks, press Allow.";
+
+    if (!window.isSecureContext) {
+      statusEl.textContent = "Not a secure camera page.";
+      feedback.textContent = "🔒 Use HTTPS or localhost.";
+      return;
+    }
+
+    const testStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+
+    // Show the test camera so the result is obvious.
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    stream = testStream;
+    video.srcObject = stream;
+    video.muted = true;
+    video.autoplay = true;
+    video.playsInline = true;
+    video.setAttribute("webkit-playsinline", "true");
+    await video.play();
+
+    cameraMessage.classList.add("hidden");
+    statusEl.textContent = "Camera permission works ✓";
+    feedback.textContent = "✅ Your phone camera is working. Press START/RESET to continue.";
+  } catch (err) {
+    console.error(err);
+    statusEl.textContent = "Camera test failed.";
+    feedback.textContent = "❌ " + (err?.name || "Camera error") + ". Make sure this site is allowed to use the camera.";
+  }
+})
+
+const startBtn = document.getElementById("startBtn");
+if (startBtn) startBtn.addEventListener("click", startCamera);
+document.getElementById("resetBtn").addEventListener("click", resetBattle);
+
+document.getElementById("flipBtn").addEventListener("click", () => {
+  mirrored = !mirrored;
+  video.style.transform = mirrored ? "scaleX(-1)" : "scaleX(1)";
+  canvas.style.transform = mirrored ? "scaleX(-1)" : "scaleX(1)";
+});
+
+
+
+document.getElementById("languageSelect").addEventListener("change", (e) => {
+  language = e.target.value;
+  applyLanguage();
+  if (language === "ar" || language === "he") {
+    document.querySelector(".app").style.direction = "rtl";
+  } else {
+    document.querySelector(".app").style.direction = "ltr";
+  }
+});
+
+document.getElementById("workoutSelect").addEventListener("change", (e) => {
+  workout = e.target.value;
+  document.getElementById("workoutLabel").textContent = t(workout);
+  resetBattle();
+  setText("stage", workout === "plank" ? "READY" : "UP");
+  feedback.textContent = workout === "plank"
+    ? "Get into a straight plank position"
+    : "Workout changed to " + workoutSettings[workout].label;
+});
+document.getElementById("difficultySelect").addEventListener("change", (e) => {
+  difficulty = e.target.value;
+  document.getElementById("difficultyLabel").textContent = t(difficulty);
+  resetBattle();
+  feedback.textContent = "Difficulty: " + difficultySettings[difficulty].label;
+});
+
+document.getElementById("quitBtn").addEventListener("click", () => {
+  if (camera) {
+    try { camera.stop(); } catch (e) {}
+    camera = null;
+  }
+
+  if (stream) {
+    stream.getTracks().forEach(track => track.stop());
+    stream = null;
+  }
+
+  started = false;
+  poseLoopRunning = false;
+  resetBattle();
+  cameraMessage.classList.remove("hidden");
+  statusEl.textContent = "Game quit — camera is off.";
+  feedback.textContent = "Press ALLOW CAMERA & START to play again.";
+});
+
+window.addEventListener("error", (event) => {
+  console.error(event.error || event.message);
+  if (statusEl) statusEl.textContent = "Game error: " + (event.message || "Unknown error");
+  if (feedback) feedback.textContent = "⚠️ The game hit an error. Open the browser console for details.";
+});
+
+window.addEventListener("resize", () => {
+  if (video.videoWidth && video.videoHeight) {
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+  }
+});
+
+applyLanguage();
+
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js?v=3").catch(() => {});
+
+window.addEventListener("beforeunload", () => {
+  if (stream) stream.getTracks().forEach(t => t.stop());
+});
+</script>
+</body>
+</html>
